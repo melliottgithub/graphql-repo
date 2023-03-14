@@ -1,213 +1,137 @@
-const graphql = require("graphql");
+const { buildSchema } = require("graphql");
+const { users, posts, hobbies } = require("../data");
 
-//dummy data
-const users = [
-  { id: "1", firstName: "John", age: 25, lastName: "Doe" },
-  { id: "2", firstName: "Jane", age: 24, lastName: "Doe" },
-  { id: "3", firstName: "Jack", age: 23, lastName: "Doe" },
-  { id: "4", firstName: "Jill", age: 22, lastName: "Doe" },
-  { id: "5", firstName: "Jenny", age: 21, lastName: "Doe" },
-];
+// Define the schema
+const schema = buildSchema(`
+  type User {
+    id: ID
+    firstName: String
+    age: Int
+    lastName: String
+    posts: [Post]
+    hobbies: [Hobby]
+  }
 
-const hobbies = [
-  { id: "1", title: "Sports", description: "Playing sports", userId: "1" },
-  { id: "2", title: "Music", description: "Playing music", userId: "2" },
-  { id: "3", title: "Cooking", description: "Cooking food", userId: "3" },
-  { id: "4", title: "Reading", description: "Reading books", userId: "4" },
-  { id: "5", title: "Writing", description: "Writing books", userId: "5" },
-];
+  type Post {
+    id: ID
+    comment: String
+    user: User
+  }
 
-const posts = [
-  { id: "1", comment: "This is a comment from 1", userId: "1" },
-  { id: "2", comment: "This is a comment from 1", userId: "1" },
-  { id: "3", comment: "This is a comment from 2", userId: "2" },
-  { id: "4", comment: "This is a comment from 5", userId: "5" },
-  { id: "5", comment: "This is a comment from 1", userId: "1" },
-];
+  type Hobby {
+    id: ID
+    title: String
+    description: String
+    user: User
+  }
 
-const {
-  GraphQLObjectType,
-  GraphQLString,
-  GraphQLSchema,
-  GraphQLID,
-  GraphQLInt,
-  GraphQLList,
-} = graphql;
+  type Query {
+    user(id: ID): User
+    hobby(id: ID): Hobby
+    post(id: ID): Post
+    users: [User]
+    hobbies: [Hobby]
+    posts: [Post]
+  }
 
-//create types
-const UserType = new GraphQLObjectType({
-  name: "User",
-  description: "Documentation for user...",
-  fields: () => ({
-    id: { type: GraphQLID },
-    firstName: { type: GraphQLString },
-    age: { type: GraphQLInt },
-    lastName: { type: GraphQLString },
-    posts: {
-      type: new GraphQLList(PostType),
-      resolve(parent, args) {
-        return posts.filter((post) => post.userId === parent.id);
-      },
-    },
-    hobbies: {
-      type: new GraphQLList(HobbyType),
-      resolve(parent, args) {
-        return hobbies.filter((hobby) => hobby.userId === parent.id);
-      },
-    },
-  }),
-});
+  type Mutation {
+    createUser(firstName: String, age: Int, lastName: String): User
+    createPost(comment: String, userId: ID): Post
+    createHobby(title: String, description: String, userId: ID): Hobby
+  }
+`);
 
-const HobbyType = new GraphQLObjectType({
-  name: "Hobby",
-  description: "Description: this is a hobby",
-  fields: () => ({
-    id: { type: GraphQLID },
-    title: { type: GraphQLString },
-    description: { type: GraphQLString },
-    user: {
-      type: UserType,
-      resolve(parent, args) {
-        return users.find((user) => user.id === parent.userId);
-      },
-    },
-  }),
-});
-
-const PostType = new GraphQLObjectType({
-  name: "Post",
-  description: "Description: this is a post",
-  fields: () => ({
-    id: { type: GraphQLID },
-    comment: { type: GraphQLString },
-    user: {
-      type: UserType,
-      resolve(parent, args) {
-        return users.find((user) => user.id === parent.userId);
-      },
-    },
-  }),
-});
-
-// RootQuery
-const RootQuery = new GraphQLObjectType({
-  name: "RootQueryType",
-  description: "Description: this is a user",
-  fields: {
-    user: {
-      type: UserType,
-      args: { id: { type: GraphQLID } },
-      resolve(parent, args) {
-        //code to get data from db / other source
-        const user = users.find((user) => user.id === args.id);
-        return user;
-      },
-    },
-
-    hobby: {
-      type: HobbyType,
-      args: { id: { type: GraphQLID } },
-      resolve(parent, args) {
-        //code to get data from db / other source
-        const hobby = hobbies.find((hobby) => hobby.id === args.id);
-        return hobby;
-      },
-    },
-
-    post: {
-      type: PostType,
-      args: { id: { type: GraphQLID } },
-      resolve(parent, args) {
-        //code to get data from db / other source
-        const post = posts.find((post) => post.id === args.id);
-        return post;
-      },
-    },
-
-    users: {
-      type: new GraphQLList(UserType),
-      resolve(parent, args) {
-        return users;
-      },
-    },
-
-    hobbies: {
-      type: new GraphQLList(HobbyType),
-      resolve(parent, args) {
-        return hobbies;
-      },
-    },
-
-    posts: {
-      type: new GraphQLList(PostType),
-      resolve(parent, args) {
-        return posts;
-      },
-    },
+const root = {
+  user: (args) => users.find((user) => user.id === args.id),
+  hobby: (args) => hobbies.find((hobby) => hobby.id === args.id),
+  post: (args) => posts.find((post) => post.id === args.id),
+  users: () => users,
+  hobbies: () => hobbies,
+  posts: () => posts,
+  createUser: (args) => {
+    const user = {
+      id: String(users.length + 1),
+      firstName: args.firstName,
+      age: args.age,
+      lastName: args.lastName,
+    };
+    users.push(user);
+    return user;
   },
-});
-
-//Mutations
-
-const Mutation = new GraphQLObjectType({
-  name: "Mutation",
-  fields: {
-    createUser: {
-      type: UserType,
-      args: {
-        firstName: { type: GraphQLString },
-        age: { type: GraphQLInt },
-        lastName: { type: GraphQLString },
-      },
-      resolve(parent, args) {
-        const user = {
-          //   id: users.length + 1,
-          firstName: args.firstName,
-          age: args.age,
-          lastName: args.lastName,
-        };
-        users.push(user);
-        return user;
-      },
-    },
-    createPost: {
-      type: PostType,
-      args: {
-        comment: { type: GraphQLString },
-        userId: { type: GraphQLID },
-      },
-      resolve(parent, args) {
-        const post = {
-          // id: posts.length + 1,
-          comment: args.comment,
-          userId: args.userId,
-        };
-        posts.push(post);
-        return post;
-      },
-    },
-    createHobby: {
-      type: HobbyType,
-      args: {
-        title: { type: GraphQLString },
-        description: { type: GraphQLString },
-        userId: { type: GraphQLID },
-      },
-      resolve(parent, args) {
-        const hobby = {
-          // id: hobbies.length + 1,
-          title: args.title,
-          description: args.description,
-          userId: args.userId,
-        };
-        hobbies.push(hobby);
-        return hobby;
-      },
-    },
+  createPost: (args) => {
+    const post = {
+      id: String(posts.length + 1),
+      comment: args.comment,
+      userId: args.userId,
+    };
+    posts.push(post);
+    return post;
   },
-});
+  createHobby: (args) => {
+    const hobby = {
+      id: String(hobbies.length + 1),
+      title: args.title,
+      description: args.description,
+      userId: args.userId,
+    };
+    hobbies.push(hobby);
+    return hobby;
+  },
+  User: {
+    posts: (user) => posts.filter((post) => post.userId === user.id),
+    hobbies: (user) => hobbies.filter((hobby) => hobby.userId === user.id),
+  },
+  Post: {
+    user: (post) => users.find((user) => user.id === post.userId),
+  },
+  Hobby: {
+    user: (hobby) => users.find((user) => user.id === hobby.userId),
+  },
+};
 
-module.exports = new GraphQLSchema({
-  query: RootQuery,
-  mutation: Mutation,
-});
+module.exports = { schema, root };
+
+// Run the queries
+// graphql(
+//   schema,
+//   `
+//     {
+//       user(id: "1") {
+//         id
+//         firstName
+//         age
+//         lastName
+//         posts {
+//           id
+//           comment
+//         }
+//         hobbies {
+//           id
+//           title
+//         }
+//       }
+//     }
+//   `,
+//   root
+// ).then((response) => {
+//   console.log(response);
+// // });
+
+// graphql(
+//   schema,
+//   `
+//     mutation {
+//       createPost(comment: "This is a new post", userId: "3") {
+//         id
+//         comment
+//         user {
+//           firstName
+//           lastName
+//         }
+//       }
+//     }
+//   `,
+//   root
+// ).then((response) => {
+//   console.log(response);
+// });
